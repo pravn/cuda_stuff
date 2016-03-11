@@ -3,7 +3,8 @@
 #include <cassert>
 
 void initialize(float *a, float *b, float *c, int size){
-  //  std::assert((a!=NULL)&&(b!=NULL)&&(c!=NULL));
+  assert((a!=NULL)&&(b!=NULL)&&(c!=NULL));
+  assert((a+size*size-1!=NULL)&&(b+size*size-1!=NULL)&&(c+size*size-1!=NULL));
   
   for(int rows=0; rows<size; rows++){
     for(int cols = 0; cols <size; cols++){
@@ -16,6 +17,8 @@ void initialize(float *a, float *b, float *c, int size){
 
 
 void matmul_host(float *a, float *b, float *c, int size){
+  assert((a!=NULL)&&(b!=NULL)&&(c!=NULL));
+  assert((a+size*size-1!=NULL)&&(b+size*size-1!=NULL)&&(c+size*size-1!=NULL));
   for(int i=0; i<size; i++){
     for(int j=0; j<size; j++){
       for(int k=0; k<size; k++){
@@ -26,7 +29,7 @@ void matmul_host(float *a, float *b, float *c, int size){
   
 
 void print(float *A, int size){
-  assert((&A[size*size-1])!=NULL);
+  assert((A!=NULL) && (A+size*size-1)!=NULL);
   
   for (int i=0; i<size; i++){
     for(int j=0; j<size; j++){
@@ -43,9 +46,8 @@ void print(float *A, int size){
   
 
 void print(float *a, float *b, float *c, int size){
-  assert(&a[0]+size*size-1!=NULL);
-  assert(&b[0]+size*size-1!=NULL);
-  assert(&c[0]+size*size-1!=NULL);
+  assert((a!=NULL)&&(b!=NULL)&&(c!=NULL));
+  assert((a+size*size-1!=NULL)&&(b+size*size-1!=NULL)&&(c+size*size-1!=NULL));
   
   std::cout << "A=" << std::endl;
     print(a, size);
