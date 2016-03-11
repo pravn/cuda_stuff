@@ -81,6 +81,10 @@ int main(int argc, char **argv){
   
     print(a,b,c,N);
 
+    free(a);
+    free(b);
+    free(c);
+
   return 0;
 
   }  
