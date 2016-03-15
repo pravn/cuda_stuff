@@ -94,27 +94,49 @@ void print(float *a, float *b, float *c, int size){
 
 }
  
-//naive
-__global__ void matmul_device(float *a, float *b, float *c, int size){
+//shmem
+__global__ void matmul_shmem(float *a, float *b, float *c, int size){
   assert((a!=NULL)&&(b!=NULL)&&(c!=NULL));
   assert((a+size*size-1!=NULL)&&(b+size*size-1!=NULL)&&(c+size*size-1!=NULL));
 
-  int tx = blockIdx.x*TILE_WIDTH + threadIdx.x;
-  int ty = blockIdx.y*TILE_WIDTH + threadIdx.y;
+  __shared__ float As[TILE_WIDTH][TILE_WIDTH];
+  __shared__ float Bs[TILE_WIDTH][TILE_WIDTH];
 
-  float p = 0;
+  int tx =  threadIdx.x;
+  int ty =  threadIdx.y;
+
+  int bx = blockIdx.x;
+  int by = blockIdx.y;
   
-  while((tx<size)&&(ty<size)){
-  for(int k=0; k<size; k++){
-    p += a[size*ty+k]*b[size*k+tx];
+
+  int rows = by*TILE_WIDTH+ty;
+  int cols = bx*TILE_WIDTH+tx;
+
+  //Load into shared memory;
+  //Sliding ...
+  float p=0;
+
+  for(int m=0; m<size/TILE_WIDTH; m++){
+    As[ty][tx] = a[rows*size + m*TILE_WIDTH+tx];
+    Bs[ty][tx] = b[size*(m*TILE_WIDTH+ty)+tx];
+
+    __syncthreads();
+
+    //Tile has been loaded into shared memory
+    //Do reduction for sliding tile;
+
+    for(int k=0; k<TILE_WIDTH; k++){
+      p += As[ty][k]*Bs[k][tx];
+    }
+    //Wait here until tile is computed
+   __syncthreads();
+    
+    c[rows*size+cols]=p;
   }
 
-
-  c[ty+size*tx]=p;
-
-  }
 }
-
+    
+   
 
 int main(int argc, char **argv){
   
@@ -147,7 +169,7 @@ int main(int argc, char **argv){
 
   
   
-  matmul_device<<<dimGrid, dimBlock>>>(a_d, b_d, c_d, SIZE);
+  matmul_shmem<<<dimGrid, dimBlock>>>(a_d, b_d, c_d, SIZE);
 
   std::cout << "DEVICE SUCCESS " << std::endl;
 
