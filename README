@@ -2,4 +2,8 @@ Experiments in CUDA.
 Waking through Wen-Mei Hwu's book.
 
 1) matmul_naive: Trivial matrix multiplication with no attempt at parallelization.
-2) matmul_shem: Tiling and shmem. 
+2) matmul_shem: Tiling and shared memory.
+
+TODO
+Timers (cpu , cuda)
+Verification 

@@ -1,8 +1,9 @@
-#define SIZE 1024
+#define SIZE 16384
 #define TILE_WIDTH 64
 #include <iostream>
 #include <cassert>
 #include <stdio.h>
+#include <Timer.h>
 
 template <typename T> 
 struct Mat{
@@ -142,6 +143,8 @@ int main(int argc, char **argv){
   
   float *a, *b, *c;
   float *a_d, *b_d, *c_d;
+
+  CPUTimer init_timer;
   
 
   a = (float *) malloc(SIZE*SIZE*sizeof(float));
@@ -149,27 +152,49 @@ int main(int argc, char **argv){
   c = (float *) malloc(SIZE*SIZE*sizeof(float));
 
 
+
+  init_timer.startTimer();
   initialize(a,b,c,SIZE);
-  //    matmul_host(a, b, c, SIZE);
+  init_timer.stopTimer();
+
+  std::cout << "Init time " << init_timer.getElapsedTime() << std::endl;
+
 
     std::cout << "HOST SUCCESS " << std::endl;
-    //    print(c, SIZE);
+    
 
-  cudaMalloc((void **)&a_d,SIZE*SIZE*sizeof(float));
-  cudaMalloc((void **)&b_d,SIZE*SIZE*sizeof(float));
-  cudaMalloc((void **)&c_d,SIZE*SIZE*sizeof(float));
 
+    
+    
+    cudaMalloc((void **)&a_d,SIZE*SIZE*sizeof(float));
+    cudaMalloc((void **)&b_d,SIZE*SIZE*sizeof(float));
+    cudaMalloc((void **)&c_d,SIZE*SIZE*sizeof(float));
+
+    CUDATimer memcpy_time;
+    CPUTimer cpu_memcpy_time;
+
+
+    memcpy_time.startTimer();
   cudaMemcpy(a_d, a, SIZE*SIZE*sizeof(float), cudaMemcpyHostToDevice);
   cudaMemcpy(b_d, b, SIZE*SIZE*sizeof(float), cudaMemcpyHostToDevice);
   cudaMemcpy(c_d, c, SIZE*SIZE*sizeof(float), cudaMemcpyHostToDevice);
+  
+  memcpy_time.stopTimer();
 
+  std::cout << "cuda memcpy H2D time " << memcpy_time.getElapsedTime() << std::endl;
 
   dim3 dimGrid(SIZE/TILE_WIDTH, SIZE/TILE_WIDTH);
   dim3 dimBlock(TILE_WIDTH, TILE_WIDTH);
 
   
+  CUDATimer kernel_time;
   
+  kernel_time.startTimer();
   matmul_shmem<<<dimGrid, dimBlock>>>(a_d, b_d, c_d, SIZE);
+  kernel_time.stopTimer();
+
+
+  std::cout << "Kernel time " << kernel_time.getElapsedTime() << std::endl;
 
   std::cout << "DEVICE SUCCESS " << std::endl;
 
