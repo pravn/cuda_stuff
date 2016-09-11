@@ -1,8 +1,12 @@
 Experiments in CUDA.
-Waking through Wen-Mei Hwu's book.
+Sources: Wen-Mei Hwu's book, Shane Cook's book and parallelforall blog.
 
 1) matmul_naive: Trivial matrix multiplication with no attempt at parallelization.
-2) matmul_shem: Tiling and shared memory.
+2) matmul_shem: Tiling and shared memory (incomplete).
+3) ballot - attempt at using ballot+popc to replace atomics. Single block.
+	- ballot_atomicadd1 uses an atomicOr to collect ballot return.
+	- balloc_atomicadd2 stores results of ballot in register and reduces 
+4) shffl - shffl instructions to do reductions. 
 
 TODO
 Timers (cpu , cuda)
