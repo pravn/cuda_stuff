@@ -37,7 +37,7 @@ __global__ void reducer(int *data, int *count ){
   __syncthreads();
   //reduce to single value 
   if(warp_id==0){
-    for(int i = NUM_WARPS_PER_BLOCK/2; i>0; i>>=2){
+    for(int i = NUM_WARPS_PER_BLOCK/2; i>0; i>>=1){
       if(tid<i)	warp_reduced_count[tid] += warp_reduced_count[tid+i];
       __syncthreads();
     }

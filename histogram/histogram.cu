@@ -41,7 +41,7 @@ __global__ void reducer(int *data, int *count ){
   __syncthreads();
   //reduce to single value 
   if(warp_id==0){
-    for(int j = WARP_SIZE/2; j>0; j>>=2){
+    for(int j = WARP_SIZE/2; j>0; j>>=1){
       for(int i = 0; i< NUM_BINS; i++){
 	if(tid<j) warp_reduced_count[tid][i] += warp_reduced_count[tid+j][i];
       __syncthreads();
@@ -53,8 +53,9 @@ __global__ void reducer(int *data, int *count ){
       
   
   if(threadIdx.x==0){
-    for(int i=0; i<NUM_BINS; i++)
+    for(int i=0; i<NUM_BINS; i++){
       count[i] = warp_reduced_count[0][i];
+    }
   }
   
 }  
