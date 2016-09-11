@@ -14,17 +14,18 @@
 #define NUM_BLOCKS 1
 #define NUM_THREADS_PER_BLOCK 64
 #define WARP_SIZE 32 
-#define NUM_BINS 16
+#define NUM_BINS 1
+#define NUM_WARPS_PER_BLOCK NUM_THREADS_PER_BLOCK/WARP_SIZE
 
 __global__ void reducer(int *data, int *count ){
   uint tid = blockIdx.x*blockDim.x + threadIdx.x;
   uint warp_id = threadIdx.x >> 5;
 
-  uint lane_id = threadIdx.x% 32;
+  uint lane_id = threadIdx.x%32;
 
   uint warp_set_bits[NUM_BINS];
 
-  __shared__ uint warp_reduced_count[WARP_SIZE][NUM_BINS];
+  __shared__ uint warp_reduced_count[NUM_WARPS_PER_BLOCK][NUM_BINS];
 
 
   for(int i=0; i<NUM_BINS; i++){
@@ -35,13 +36,14 @@ __global__ void reducer(int *data, int *count ){
   if(lane_id==0){
     for(int i=0; i<NUM_BINS; i++){
       warp_reduced_count[warp_id][i] = __popc(warp_set_bits[i]);
+      printf("warp_reduced_count %d\n", warp_reduced_count[warp_id][i]);
     }
   }
 
   __syncthreads();
   //reduce to single value 
   if(warp_id==0){
-    for(int j = WARP_SIZE/2; j>0; j>>=1){
+    for(int j = NUM_WARPS_PER_BLOCK/2; j>0; j>>=1){
       for(int i = 0; i< NUM_BINS; i++){
 	if(tid<j) warp_reduced_count[tid][i] += warp_reduced_count[tid+j][i];
       __syncthreads();

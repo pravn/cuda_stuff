@@ -1,8 +1,5 @@
 cmake_minimum_required(VERSION 2.8)
 Project(matmul_naive)
-
-SET(CMAKE_CXX_COMPILER g++)
-FIND_PACKAGE(CUDA REQUIRED)
 SET(CMAKE_VERBOSE_MAKEFILE TRUE)
 
 

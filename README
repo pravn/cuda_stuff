@@ -12,5 +12,19 @@ Sources: Wen-Mei Hwu's book, Shane Cook's book and parallelforall blog.
 	implementation simply adds an extra array dimension to 3) for each
 	bin. Check later to compare speed with that of atomicAdd.
 
+6) thrust - pulled out stream compaction sample from thrust repo. Ignorable.
+
 TODO
-	Multiblock kernels for ballot, shuffl, histogram and atomics. 
+	Multiblock kernels for ballot, shuffl, histogram and atomics.
+	Atomics in shared memory and private per thread histograms from
+	Nicholas Wilt's article online.
+	Timing experiments for various tests. In particular
+
+	Atomics performance where threads write to a small number of bins.
+	The hope is make an evaluation of various methods and pronounce which
+	one of them is the most performant.
+
+	a) Naive and Shared memory atomics
+	b) Per thread histogram as per Wilt
+	c) Ballot+Popc followed by a subsequent reduction.
+	

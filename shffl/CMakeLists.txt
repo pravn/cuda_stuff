@@ -1,6 +1,4 @@
 cmake_minimum_required(VERSION 2.8)
-FIND_PACKAGE(CUDA REQUIRED)
-SET(CUDA_NVCC_FLAGS "-arch=sm_35 -std=c++11")
 SET(CMAKE_VERBOSE_MAKEFILE TRUE)
 CUDA_ADD_EXECUTABLE(shffl shffl.cu)
 
