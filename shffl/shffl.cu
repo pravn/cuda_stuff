@@ -1,6 +1,12 @@
 #include <stdio.h>
 #include <iostream>
 #define warpSize 32
+//experiment trying out __shffl instruction for reduction
+//single block
+//mostly copied (ideas, code) from Justin Luitjens' post 
+//in parallel for all 
+//https://devblogs.nvidia.com/parallelforall/faster-parallel-reductions-kepler/
+
 
 inline __device__
 int warpReduceSum(int value){
