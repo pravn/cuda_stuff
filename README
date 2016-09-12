@@ -14,6 +14,28 @@ Sources: Wen-Mei Hwu's book, Shane Cook's book and parallelforall blog.
 
 6) thrust - pulled out stream compaction sample from thrust repo. Ignorable.
 
+
+=============================================================================
+Results and temorary notes pased from last commit
+Histogram computations compared for popc+ballot vs atomicAdd in shared memory 
+=============================================================================
+
+We have N threads writing to a small number of bins M.
+The ballot+popc histogram is implemented by doing warp level reductions using
+ballot and popc.
+
+It performs much faster than the naked atomicAdd for the case where
+all threads write to a single bin. However, its performance degrades
+with number of bins. This could possibly because of it being a one dimensional
+kernel, whereupon it might happen that the single thread incrementing M bin counters
+might be overwhelemed when it has to handle a large number of threads.
+
+The next step is therefore to parallelize the bin counter loop in the Y direction
+to use a thread for each bin counter.
+
+For now, it appears that the popc histogram is successful in that it overcomes
+some of the contention limitations of the atomicAdd histogram.
+
 TODO
 	Multiblock kernels for ballot, shuffl, histogram and atomics.
 	Atomics in shared memory and private per thread histograms from
