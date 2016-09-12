@@ -28,7 +28,7 @@ It performs much faster than the naked atomicAdd for the case where
 all threads write to a single bin. However, its performance degrades
 with number of bins. This could possibly because of it being a one dimensional
 kernel, whereupon it might happen that the single thread incrementing M bin counters
-might be overwhelemed when it has to handle a large number of threads.
+might be overwhelemed when it has to handle a large number of bin variables.
 
 The next step is therefore to parallelize the bin counter loop in the Y direction
 to use a thread for each bin counter.
