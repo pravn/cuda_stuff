@@ -15,7 +15,7 @@
 #define NUM_BLOCKS 4000
 #define NUM_THREADS_PER_BLOCK 256
 #define WARP_SIZE 32 
-#define NUM_BINS 2
+#define NUM_BINS 256
 #define NUM_WARPS_PER_BLOCK NUM_THREADS_PER_BLOCK/WARP_SIZE
 
 __global__ void shmem_atomics_reducer(int *data, int *count){
@@ -135,10 +135,11 @@ void run_atomics_reducer(int *h_data){
   std::cout << "atomics bandwidth " << bandwidth << std::endl;
   
 
+  /*
   for(int i=0; i<NUM_BINS; i++){
     std::cout << h_result[i] << " " << h_result_atomics[i] << std::endl;
   }
-  
+  */
 
   
 
@@ -196,11 +197,11 @@ void run_ballot_popc_reducer(int *h_data){
 
   std::cout << "popc bandwidth " << bandwidth << std::endl;
   
-
+  
   for(int i=0; i<NUM_BINS; i++){
     std::cout << h_result[i] << " " << h_result_ballot_popc[i] << std::endl;
   }
-
+  
 
   cudaFree(d_data);
   delete[] h_result_ballot_popc;
@@ -224,7 +225,7 @@ int main()
 
   for(int i=0; i<NUM_THREADS_PER_BLOCK*NUM_BLOCKS; i++){
     h_data[i] = (NUM_BINS) * ((float) rand()/RAND_MAX);
-    printf("data[%d] %d\n", i, h_data[i]);
+    //    printf("data[%d] %d\n", i, h_data[i]);
   }
 
 

@@ -51,6 +51,11 @@ class CUDATimer: public Timer{
     cudaEventCreate(&stop);
   }
 
+  ~CUDATimer(){
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+  }
+
   void startTimer(){
     cudaEventRecord(start);
   }
