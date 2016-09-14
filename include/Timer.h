@@ -14,6 +14,7 @@ class Timer{
 #include <chrono>
 #include <ctime>
 
+
 class CPUTimer: public Timer{
  public:
   CPUTimer(){
@@ -44,6 +45,7 @@ class CPUTimer: public Timer{
 };
 
 
+
 class CUDATimer: public Timer{
  public:
   CUDATimer(){
@@ -51,12 +53,17 @@ class CUDATimer: public Timer{
     cudaEventCreate(&stop);
   }
 
+  ~CUDATimer(){
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+  }
+
   void startTimer(){
-    cudaEventRecord(start);
+    cudaEventRecord(start,0);
   }
 
   void stopTimer(){
-    cudaEventRecord(stop);
+    cudaEventRecord(stop,0);
   }
 
   double getElapsedTime(){
@@ -65,9 +72,10 @@ class CUDATimer: public Timer{
     return static_cast<double> (milliseconds);
   }
 
+
  private:
   cudaEvent_t start, stop;
-  float milliseconds;
+  float milliseconds = 0;
 };
   
     
