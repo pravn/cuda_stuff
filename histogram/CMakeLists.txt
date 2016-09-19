@@ -1,3 +1,2 @@
 SET(CMAKE_VERBOSE_MAKEFILE TRUE)
 CUDA_ADD_EXECUTABLE(histogram histogram.cu)
-

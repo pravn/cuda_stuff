@@ -12,12 +12,17 @@
 //Shane Cook's CUDA Programming book
 //single block 
 
-const long int NUM_BLOCKS=2<<8;
-#define NUM_THREADS_PER_BLOCK 32
+const long int NUM_BLOCKS=1000;
 #define WARP_SIZE 32 
 #define NUM_BINS 32
+#define NUM_THREADS_PER_BLOCK WARP_SIZE*NUM_BINS
 #define NUM_WARPS_PER_BLOCK NUM_THREADS_PER_BLOCK/WARP_SIZE
 #define BIN_UNROLL 8
+
+#include "reducer.cuh"
+#include "test_reducer.cuh"
+
+
 
 __global__ void shmem_atomics_reducer(int *data, int *count){
   uint tid = blockIdx.x*blockDim.x + threadIdx.x;
@@ -26,8 +31,6 @@ __global__ void shmem_atomics_reducer(int *data, int *count){
   block_reduced[threadIdx.x] = 0;
 
   __syncthreads();
-
-  
 
     atomicAdd(&block_reduced[data[tid]],1);
   __syncthreads();
@@ -38,6 +41,7 @@ __global__ void shmem_atomics_reducer(int *data, int *count){
 }
 	  
 
+
 __global__ void ballot_popc_reducer(int *data, int *count ){
   uint tid = blockIdx.x*blockDim.x + threadIdx.x;
   uint warp_id = threadIdx.x >> 5;
@@ -47,25 +51,23 @@ __global__ void ballot_popc_reducer(int *data, int *count ){
   uint warp_set_bits=0;
 
   __shared__ uint warp_reduced_count[NUM_WARPS_PER_BLOCK];
+  __shared__ uint s_data[NUM_THREADS_PER_BLOCK];
+
+
+  s_data[threadIdx.x] = data[tid];
+
+  __syncthreads();
+  
 
 
   for(int i=0; i<NUM_BINS; i++){
-    if(blockIdx.x%NUM_BINS==i){
-    //  printf("w %d\n", data[tid]);
-
-      int did = blockIdx.x/NUM_BINS*blockDim.x + threadIdx.x;
-
-      warp_set_bits = __ballot(data[did]==i);
-      //      warp_set_bits = __ballot(s_data[threadIdx.x]==i);
+      warp_set_bits = __ballot(s_data[threadIdx.x]==i);
 
       if(lane_id==0){
 	warp_reduced_count[warp_id] = __popc(warp_set_bits);
       }
   
-      //    printf("warp_reduced_count %d\n", warp_reduced_count[warp_id][i]);
-  
       __syncthreads();
-      //reduce to single value 
 
 
       if(warp_id==0){
@@ -75,6 +77,7 @@ __global__ void ballot_popc_reducer(int *data, int *count ){
 	  __syncthreads();
 	}
       }//warp id
+
 
 
       __syncthreads();
@@ -88,10 +91,10 @@ __global__ void ballot_popc_reducer(int *data, int *count ){
     } // if(blockIdx.x%NUM_BINS==i)
   
   }//for 
-}
 
 
 
+#ifdef JUNK
 __global__ void ballot_popc_reducer2(int *data, int *count ){
   uint tid = blockIdx.x*blockDim.x + threadIdx.x;
   uint warp_id = threadIdx.x >> 5;
@@ -237,6 +240,7 @@ __global__ void ballot_popc_reducer4(int *data, int *count ){
 
     
 }
+#endif
 
 
 void run_atomics_reducer(int *h_data){
@@ -301,10 +305,11 @@ void run_atomics_reducer(int *h_data){
   std::cout << "atomics bandwidth " << bandwidth << std::endl;
 
 
-  /*  
+
   for(int i=0; i<NUM_BINS; i++){
     std::cout << h_result[i] << " " << h_result_atomics[i] << std::endl;
-    }*/
+    }
+
   
 
   
@@ -320,6 +325,87 @@ void run_atomics_reducer(int *h_data){
   
 
 //assume that we have sizes coded correctly
+void run_test_reducer(int *h_data){
+  int *d_data;
+  int *h_result_ballot_popc;
+  int *d_result_ballot_popc;
+  int *h_result;
+  
+  cudaMalloc((void **) &d_data, NUM_BLOCKS*NUM_THREADS_PER_BLOCK*sizeof(int));
+  cudaMemcpy(d_data, h_data, NUM_BLOCKS*NUM_THREADS_PER_BLOCK*sizeof(int), cudaMemcpyHostToDevice);
+
+  h_result = new int[NUM_BINS];
+  memset(h_result, 0, NUM_BINS*sizeof(int));
+  
+  cudaMalloc((void **) &d_result_ballot_popc, NUM_BINS*sizeof(int));
+  cudaMemset(d_result_ballot_popc, 0, NUM_BINS*sizeof(int));
+
+  CUDATimer popc_timer;
+
+
+    popc_timer.startTimer();
+
+#ifdef DISCARD
+     ballot_popc_reducer<<<NUM_BINS*NUM_BLOCKS, NUM_THREADS_PER_BLOCK>>> (d_data, d_result_ballot_popc);
+  ballot_popc_reducer2<<<NUM_BLOCKS, WARP_SIZE*NUM_BINS>>> (d_data, d_result_ballot_popc);
+    ballot_popc_reducer3<<<NUM_BLOCKS, WARP_SIZE*NUM_BINS>>> (d_data, d_result_ballot_popc);
+    ballot_popc_reducer4<<<NUM_BLOCKS, WARP_SIZE*NUM_BINS>>> (d_data, d_result_ballot_popc);
+#endif
+
+    //    dim3 dimBlock(NUM_THREADS_PER_BLOCK, NUM_BINS);
+
+    
+
+        const int NITER = 1;
+    for (int iter = 0; iter < NITER; iter++)
+        cudaMemset(d_result_ballot_popc, 0,  NUM_BINS*sizeof(int));
+    //      parallel_popc_histogram_caller<<<NUM_BLOCKS, dimBlock>>> (d_data, d_result_ballot_popc);
+    //     ballot_popc_reducer<<<NUM_BLOCKS, NUM_THREADS_PER_BLOCK>>> (d_data, d_result_ballot_popc);
+    test_reducer<<<NUM_BLOCKS, NUM_THREADS_PER_BLOCK>>> (d_data, d_result_ballot_popc);
+    //  shmem_atomics_reducer<<< NUM_BLOCKS, NUM_THREADS_PER_BLOCK>>> (d_data, d_result_ballot_popc);
+    popc_timer.stopTimer();
+
+
+
+  for(int i=0; i<NUM_THREADS_PER_BLOCK*NUM_BLOCKS; i++){
+    for(int j=0; j<NUM_BINS; j++){
+      if(h_data[i]==j)
+	h_result[j]++;
+    }
+  }
+	
+  h_result_ballot_popc = new int[NUM_BINS];
+  cudaMemcpy(h_result_ballot_popc, d_result_ballot_popc, NUM_BINS*sizeof(int), cudaMemcpyDeviceToHost);
+
+  std::cout << "===================================" << std::endl;
+  std::cout << "popc time " << popc_timer.getElapsedTime() << std::endl;
+									   //  std::cout << "popc time " << milliseconds << std::endl;
+
+  float mbytes = NUM_THREADS_PER_BLOCK*NUM_BLOCKS*sizeof(int)*1e-6;
+
+  //  std::cout << "MB = " << mbytes << std::endl;
+
+  float bandwidth = NITER*mbytes/popc_timer.getElapsedTime()*1e3;
+
+  //  float bandwidth = mbytes/milliseconds*1e3;
+
+  std::cout << "popc bandwidth " << bandwidth << std::endl;
+
+
+
+  for(int i=0; i<NUM_BINS; i++){
+    std::cout << h_result[i] << " " << h_result_ballot_popc[i] << std::endl;
+    }
+
+
+  cudaFree(d_data);
+  delete[] h_result_ballot_popc;
+  cudaFree(d_result_ballot_popc);
+  delete[] h_result;
+  
+}
+
+
 void run_ballot_popc_reducer(int *h_data){
   int *d_data;
   int *h_result_ballot_popc;
@@ -338,23 +424,29 @@ void run_ballot_popc_reducer(int *h_data){
   CUDATimer popc_timer;
 
 
-  //  cudaEventRecord(start);
     popc_timer.startTimer();
-    //  ballot_popc_reducer<<<NUM_BINS*NUM_BLOCKS, NUM_THREADS_PER_BLOCK>>> (d_data, d_result_ballot_popc);
-  //ballot_popc_reducer2<<<NUM_BLOCKS, WARP_SIZE*NUM_BINS>>> (d_data, d_result_ballot_popc);
-  //  ballot_popc_reducer3<<<NUM_BLOCKS, WARP_SIZE*NUM_BINS>>> (d_data, d_result_ballot_popc);
-  const int NITER = 1000;
-  for (int iter = 0; iter < NITER; iter++)
+
+#ifdef DISCARD
+     ballot_popc_reducer<<<NUM_BINS*NUM_BLOCKS, NUM_THREADS_PER_BLOCK>>> (d_data, d_result_ballot_popc);
+  ballot_popc_reducer2<<<NUM_BLOCKS, WARP_SIZE*NUM_BINS>>> (d_data, d_result_ballot_popc);
+    ballot_popc_reducer3<<<NUM_BLOCKS, WARP_SIZE*NUM_BINS>>> (d_data, d_result_ballot_popc);
     ballot_popc_reducer4<<<NUM_BLOCKS, WARP_SIZE*NUM_BINS>>> (d_data, d_result_ballot_popc);
+#endif
+
+    //    dim3 dimBlock(NUM_THREADS_PER_BLOCK, NUM_BINS);
+
+    
+
+        const int NITER = 1;
+    for (int iter = 0; iter < NITER; iter++)
+        cudaMemset(d_result_ballot_popc, 0,  NUM_BINS*sizeof(int));
+    //      parallel_popc_histogram_caller<<<NUM_BLOCKS, dimBlock>>> (d_data, d_result_ballot_popc);
+    //     ballot_popc_reducer<<<NUM_BLOCKS, NUM_THREADS_PER_BLOCK>>> (d_data, d_result_ballot_popc);
+    ballot_popc_reducer<<<NUM_BLOCKS, NUM_THREADS_PER_BLOCK>>> (d_data, d_result_ballot_popc);
+    //  shmem_atomics_reducer<<< NUM_BLOCKS, NUM_THREADS_PER_BLOCK>>> (d_data, d_result_ballot_popc);
     popc_timer.stopTimer();
 
-    //  cudaEventRecord(stop);
 
-    //  cudaEventSynchronize(stop);
-  
-    //  float milliseconds = 0;
-  //  cudaEventElapsedTime(&milliseconds, start, stop);
-  
 
   for(int i=0; i<NUM_THREADS_PER_BLOCK*NUM_BLOCKS; i++){
     for(int j=0; j<NUM_BINS; j++){
@@ -370,21 +462,21 @@ void run_ballot_popc_reducer(int *h_data){
   std::cout << "popc time " << popc_timer.getElapsedTime() << std::endl;
 									   //  std::cout << "popc time " << milliseconds << std::endl;
 
-  float bytes = NUM_THREADS_PER_BLOCK*NUM_BLOCKS*sizeof(int);
+  float mbytes = NUM_THREADS_PER_BLOCK*NUM_BLOCKS*sizeof(int)*1e-6;
 
   //  std::cout << "MB = " << mbytes << std::endl;
 
-  float bandwidth = NITER*bytes/popc_timer.getElapsedTime()/1e6;
+  float bandwidth = NITER*mbytes/popc_timer.getElapsedTime()*1e3;
 
   //  float bandwidth = mbytes/milliseconds*1e3;
 
   std::cout << "popc bandwidth " << bandwidth << std::endl;
-  
 
-  /*
+
+
   for(int i=0; i<NUM_BINS; i++){
     std::cout << h_result[i] << " " << h_result_ballot_popc[i] << std::endl;
-    }*/
+    }
 
 
   cudaFree(d_data);
@@ -407,7 +499,8 @@ int main()
   std::cout << "dimensions " << NUM_THREADS_PER_BLOCK * NUM_BLOCKS << std::endl;
 
   for(int i=0; i<NUM_THREADS_PER_BLOCK*NUM_BLOCKS; i++){
-    h_data[i] = (NUM_BINS) * ((float) rand()/RAND_MAX);
+    //    h_data[i] = (NUM_BINS) * ((float) rand()/RAND_MAX);
+    h_data[i] = 0;
     //    printf("data[%d] %d\n", i, h_data[i]);
   }
 
@@ -415,9 +508,10 @@ int main()
 
   std::cout << "NUM_WARPS_PER_BLOCK " << NUM_WARPS_PER_BLOCK << std::endl;
   
-  run_ballot_popc_reducer(h_data);
+  //    run_ballot_popc_reducer(h_data);
+  run_test_reducer(h_data);
   //  cudaDeviceSynchronize();
-    run_atomics_reducer(h_data);
+        run_atomics_reducer(h_data);
 
 
 
