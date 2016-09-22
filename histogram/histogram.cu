@@ -2,6 +2,7 @@
 #include <cuda.h>
 #include <Timer.h>
 
+
 //initial attempt - probably not very performant
 //histogram with N bins in several blocks 
 //using ballot to set bits 
@@ -13,10 +14,12 @@
 //single block 
 
 #define NUM_BLOCKS 4000
-#define NUM_THREADS_PER_BLOCK 256
+#define NUM_THREADS_PER_BLOCK 32
 #define WARP_SIZE 32 
-#define NUM_BINS 256
+#define NUM_BINS 16
 #define NUM_WARPS_PER_BLOCK NUM_THREADS_PER_BLOCK/WARP_SIZE
+
+#include "reduced_contention.cuh"
 
 __global__ void shmem_atomics_reducer(int *data, int *count){
   uint tid = blockIdx.x*blockDim.x + threadIdx.x;
@@ -169,9 +172,12 @@ void run_ballot_popc_reducer(int *h_data){
 
   CUDATimer popc_timer;
 
+  dim3 dim_block(NUM_THREADS_PER_BLOCK, NUM_BINS);
 
   popc_timer.startTimer();
-  ballot_popc_reducer<<<NUM_BINS*NUM_BLOCKS, NUM_THREADS_PER_BLOCK>>> (d_data, d_result_ballot_popc);
+  //  ballot_popc_reducer<<<NUM_BINS*NUM_BLOCKS, NUM_THREADS_PER_BLOCK>>> (d_data, d_result_ballot_popc);
+  reduced_contention<<<NUM_BLOCKS, dim_block>>> (d_data, d_result_ballot_popc);
+  
   popc_timer.stopTimer();
 
   
@@ -197,10 +203,11 @@ void run_ballot_popc_reducer(int *h_data){
 
   std::cout << "popc bandwidth " << bandwidth << std::endl;
   
-  
+  /*
   for(int i=0; i<NUM_BINS; i++){
     std::cout << h_result[i] << " " << h_result_ballot_popc[i] << std::endl;
-  }
+    }*/
+
   
 
   cudaFree(d_data);
@@ -232,7 +239,7 @@ int main()
 
   std::cout << "NUM_WARPS_PER_BLOCK " << NUM_WARPS_PER_BLOCK << std::endl;
   
-   run_ballot_popc_reducer(h_data);
+  run_ballot_popc_reducer(h_data);
   run_atomics_reducer(h_data);
 
 

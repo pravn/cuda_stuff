@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 Project(cuda_experiments)
 FIND_PACKAGE(CUDA REQUIRED)
+FIND_PACKAGE(OpenMP REQUIRED)
 SET(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda-7.5)
 INCLUDE_DIRECTORIES(include)
 
@@ -9,6 +10,7 @@ SET(CUDA_NVCC_FLAGS "-gencode arch=compute_35,code=sm_35 \
 -gencode arch=compute_52,code=sm_52  -std=c++11")
 #ADD_SUBDIRECTORY(matmul_naive)
 #ADD_SUBDIRECTORY(matmul_shmem)
-ADD_SUBDIRECTORY(shffl)
-ADD_SUBDIRECTORY(ballot)
-ADD_SUBDIRECTORY(histogram)
+#ADD_SUBDIRECTORY(shffl)
+#ADD_SUBDIRECTORY(ballot)
+#ADD_SUBDIRECTORY(histogram)
+ADD_SUBDIRECTORY(vectorized_loads)
