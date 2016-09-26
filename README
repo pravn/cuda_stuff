@@ -12,7 +12,13 @@ Sources: Wen-Mei Hwu's book, Shane Cook's book and parallelforall blog.
 	implementation simply adds an extra array dimension to 3) for each
 	bin. Check later to compare speed with that of atomicAdd.
 
-6) thrust - pulled out stream compaction sample from thrust repo. Ignorable.
+6) thrust - Pulled out stream compaction sample from thrust repo. Ignorable for now.
+   	    Later investigations should tell us how atomics work with thrust.
+
+7) vectorized_loads - This is a copy of Justin Luitjens' suggestion in the CUDA parallelforall blog
+   		    Reading global memory data in vectorized fashion seems to work nicely. 
+		    But I am not quite sure if the bandwidth numbers produced by code are 'correct'. 
+
 
 
 =============================================================================

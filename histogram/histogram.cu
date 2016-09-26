@@ -12,10 +12,10 @@
 //Shane Cook's CUDA Programming book
 //single block 
 
-const long int NUM_BLOCKS=1000;
+const long int NUM_BLOCKS=256;
 #define WARP_SIZE 32 
 #define NUM_BINS 32
-#define NUM_THREADS_PER_BLOCK 512
+#define NUM_THREADS_PER_BLOCK 256
 #define NUM_WARPS_PER_BLOCK NUM_THREADS_PER_BLOCK/WARP_SIZE
 #define BIN_UNROLL 8
 
@@ -499,8 +499,8 @@ int main()
   std::cout << "dimensions " << NUM_THREADS_PER_BLOCK * NUM_BLOCKS << std::endl;
 
   for(int i=0; i<NUM_THREADS_PER_BLOCK*NUM_BLOCKS; i++){
-        h_data[i] = (NUM_BINS) * ((float) rand()/RAND_MAX);
-	//h_data[i] = 0;
+            h_data[i] = (NUM_BINS) * ((float) rand()/RAND_MAX);
+    //h_data[i] = 0;
     //    printf("data[%d] %d\n", i, h_data[i]);
   }
 
