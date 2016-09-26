@@ -5,7 +5,7 @@ SET(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda-7.5)
 INCLUDE_DIRECTORIES(include)
 
 #SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-SET(CUDA_NVCC_FLAGS "-gencode arch=compute_52,code=sm_52  -std=c++11")
+SET(CUDA_NVCC_FLAGS "-gencode arch=compute_52,code=sm_52;-gencode arch=compute_35,code=sm_35 -std=c++11")
 #ADD_SUBDIRECTORY(matmul_naive)
 #ADD_SUBDIRECTORY(matmul_shmem)
 #ADD_SUBDIRECTORY(shffl)

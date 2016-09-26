@@ -1,0 +1,2 @@
+SET(CMAKE_VERBOSE_MAKEFILE TRUE)
+CUDA_ADD_EXECUTABLE(vectorized_loads vectorized_loads.cu)
