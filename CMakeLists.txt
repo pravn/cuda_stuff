@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 Project(cuda_experiments)
+SET(CUDA_COMPILE_CHAIN "clang")
 FIND_PACKAGE(CUDA REQUIRED)
 SET(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda-7.5)
 INCLUDE_DIRECTORIES(include)

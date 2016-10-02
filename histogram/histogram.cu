@@ -1,6 +1,9 @@
 #include <iostream>
 #include <cuda.h>
 #include <Timer.h>
+#include <thrust/device_vector.h>
+#include <thrust/count.h>
+#include <thrust/sort.h>
 
 //initial attempt - probably not very performant
 //histogram with N bins in several blocks 
@@ -19,227 +22,19 @@ const long int NUM_BLOCKS=1024;
 #define NUM_WARPS_PER_BLOCK NUM_THREADS_PER_BLOCK/WARP_SIZE
 #define BIN_UNROLL 8
 
-#include "reducer.cuh"
-#include "test_reducer.cuh"
+#include "shmem_atomics_reducer.cuh"
+#include "ballot_popc_reducer.cuh"
+//this one seems to be bogus
+//#include "reducer.cuh"
+//another bogus test
+//#include "test_reducer.cuh"
 #include "vectorized_load_atomics.cuh"
 
-
-
-__global__ void shmem_atomics_reducer(int *data, int *count){
-  uint tid = blockIdx.x*blockDim.x + threadIdx.x;
-
-  __shared__ int block_reduced[NUM_THREADS_PER_BLOCK];
-  block_reduced[threadIdx.x] = 0;
-
-  __syncthreads();
-
-    atomicAdd(&block_reduced[data[tid]],1);
-  __syncthreads();
-
-  for(int i=threadIdx.x; i<NUM_BINS; i+=NUM_BINS)
-    atomicAdd(&count[i],block_reduced[i]);
-  
-}
-	  
-
-
-__global__ void ballot_popc_reducer(int *data, int *count ){
-  uint tid = blockIdx.x*blockDim.x + threadIdx.x;
-  uint warp_id = threadIdx.x >> 5;
-
-  uint lane_id = threadIdx.x%32;
-
-  uint warp_set_bits=0;
-
-  __shared__ uint warp_reduced_count[NUM_WARPS_PER_BLOCK];
-  __shared__ uint s_data[NUM_THREADS_PER_BLOCK];
-
-
-  s_data[threadIdx.x] = data[tid];
-
-  __syncthreads();
-  
-
-
-  for(int i=0; i<NUM_BINS; i++){
-      warp_set_bits = __ballot(s_data[threadIdx.x]==i);
-
-      if(lane_id==0){
-	warp_reduced_count[warp_id] = __popc(warp_set_bits);
-      }
-  
-      __syncthreads();
-
-
-      if(warp_id==0){
-	int t = threadIdx.x;
-	for(int j = NUM_WARPS_PER_BLOCK/2; j>0; j>>=1){
-	  if(t<j) warp_reduced_count[t] += warp_reduced_count[t+j];
-	  __syncthreads();
-	}
-      }//warp id
-
-
-
-      __syncthreads();
-      
-
-      if(threadIdx.x==0){
-	atomicAdd(&count[i],warp_reduced_count[0]);
-	}
-
-
-    } // if(blockIdx.x%NUM_BINS==i)
-  
-  }//for 
-
-
-
-#ifdef JUNK
-__global__ void ballot_popc_reducer2(int *data, int *count ){
-  uint tid = blockIdx.x*blockDim.x + threadIdx.x;
-  uint warp_id = threadIdx.x >> 5;
-
-  uint lane_id = threadIdx.x%32;
-
-  uint warp_set_bits=0;
-
-  __shared__ uint s_data[WARP_SIZE];
-
-  __shared__ uint warp_reduced_count[NUM_WARPS_PER_BLOCK];
-
-  uint did = blockIdx.x*WARP_SIZE + lane_id;
-
-  if(warp_id==0){
-    s_data[lane_id] = data[did];
-  }
-  __syncthreads();
-
-
-  for(int i=0; i<NUM_BINS; i++){
-    if(warp_id==i){
-    //  printf("w %d\n", data[tid]);
-      warp_set_bits = __ballot(s_data[lane_id]==i);
-      //      warp_set_bits = __ballot(s_data[threadIdx.x]==i);
-
-      if(lane_id==0){
-	warp_reduced_count[warp_id] = __popc(warp_set_bits);
-      }
-      //    printf("warp_reduced_count %d\n", warp_reduced_count[warp_id][i]);
-      __syncthreads();
-      //reduce to single value 
-
-    if(lane_id==0){
-      atomicAdd(&count[i], warp_reduced_count[i]);
-    }
-
-    } // if(blockIdx.x%NUM_BINS==i)
-
-
-
-  
-  }//for 
-
-
+inline double calc_bandwidth(double time_ms){
+  int megabyte =  1<<20;
+  return  (double) NUM_BLOCKS*NUM_THREADS_PER_BLOCK*sizeof(int)/megabyte /(time_ms*1e-3);
 }
 
-
-__global__ void ballot_popc_reducer3(int *data, int *count ){
-  uint tid = blockIdx.x*blockDim.x + threadIdx.x;
-  uint warp_id = threadIdx.x >> 5;
-
-  uint lane_id = threadIdx.x%32;
-
-  uint warp_set_bits[BIN_UNROLL];
-
-  __shared__ uint s_data[WARP_SIZE];
-
-  __shared__ uint warp_reduced_count[NUM_WARPS_PER_BLOCK];
-
-  uint did = blockIdx.x*WARP_SIZE + lane_id;
-
-  if(warp_id==0){
-    s_data[lane_id] = data[did];
-  }
-  __syncthreads();
-
-
-  for(int i=0; i<NUM_BINS/BIN_UNROLL; i++){
-    if(warp_id==i){
-    //  printf("w %d\n", data[tid]);
-#pragma unroll 
-      for(int j=0; j<BIN_UNROLL;j++){
-	warp_set_bits[j] = __ballot(s_data[lane_id]==BIN_UNROLL*i+j);
-
-
-	if(lane_id==0){
-	  warp_reduced_count[i*BIN_UNROLL+j] = __popc(warp_set_bits[j]);
-	}
-
-	__syncthreads();
-	//reduce to single value 
-
-	if(lane_id==0){
-	  atomicAdd(&count[i*BIN_UNROLL+j], warp_reduced_count[i*BIN_UNROLL+j]);
-	}
-      }
-    } // if(blockIdx.x%NUM_BINS==i)
-  
-  }//for 
-
-
-}
-
-
-
-
-__global__ void ballot_popc_reducer4(int *data, int *count ){
-  uint tid = blockIdx.x*blockDim.x + threadIdx.x;
-  uint warp_id = threadIdx.x >> 5;
-
-  uint lane_id = threadIdx.x%32;
-
-  uint warp_set_bits[BIN_UNROLL];
-
-  __shared__ uint s_data[WARP_SIZE];
-
-  __shared__ uint warp_reduced_count[NUM_WARPS_PER_BLOCK];
-
-  uint did = blockIdx.x*WARP_SIZE + lane_id;
-
-  if(warp_id==0){
-    s_data[lane_id] = data[did];
-  }
-  __syncthreads();
-
-
-    for(int i=0; i<NUM_BINS/BIN_UNROLL; i++){
-    if(warp_id==i){
-    //  printf("w %d\n", data[tid]);
-#pragma unroll 
-      for(int j=0; j<BIN_UNROLL;j++){
-	warp_set_bits[j] = __ballot(s_data[lane_id]==BIN_UNROLL*i+j);
-	
-
-	if(lane_id==0){
-	  warp_reduced_count[i*BIN_UNROLL+j] = __popc(warp_set_bits[j]);
-	}
-
-	__syncthreads();
-	//reduce to single value 
-
-	if(lane_id==0){
-	  atomicAdd(&count[i*BIN_UNROLL+j], warp_reduced_count[i*BIN_UNROLL+j]);
-	}
-      }
-    } // if(blockIdx.x%NUM_BINS==i)
-  
-  }//for 
-
-
-    
-}
-#endif
 
 
 void run_atomics_reducer(int *h_data){
@@ -351,6 +146,7 @@ void run_vectorized_load_atomics(int *h_data){
   
 
 //assume that we have sizes coded correctly
+#ifdef TEST_REDUCER
 void run_test_reducer(int *h_data){
   int *d_data;
   int *h_result_ballot_popc;
@@ -430,6 +226,7 @@ void run_test_reducer(int *h_data){
   delete[] h_result;
   
 }
+#endif
 
 
 void run_ballot_popc_reducer(int *h_data){
@@ -510,7 +307,27 @@ void run_ballot_popc_reducer(int *h_data){
 }
   
   
-  
+void run_thrust_sort_testing(int *h_data){
+  int *d_data;
+
+  cudaMalloc((void **) &d_data, NUM_BLOCKS*NUM_THREADS_PER_BLOCK*sizeof(int));
+  cudaMemcpy(d_data, h_data, NUM_BLOCKS*NUM_THREADS_PER_BLOCK*sizeof(int), cudaMemcpyHostToDevice);
+
+  thrust::device_ptr<int> t_data(d_data);
+
+  CUDATimer sort_time;
+
+  sort_time.startTimer();
+  thrust::sort(t_data, t_data+NUM_BLOCKS*NUM_THREADS_PER_BLOCK,0);
+  sort_time.stopTimer();
+
+  double time_ms = sort_time.getElapsedTime();
+
+  std::cout << "thrust time in ms " << time_ms << std::endl;
+  std::cout << "thrust sort bandwidth in megabytes per second " << calc_bandwidth(time_ms) << std::endl;
+    
+  cudaFree(d_data);
+}
   
 
 
@@ -540,6 +357,7 @@ int main()
   //run_test_reducer(h_data);
   run_atomics_reducer(h_data);
   run_vectorized_load_atomics(h_data);
+  run_thrust_sort_testing(h_data);
 
   //cleanup
   delete[] h_data;
