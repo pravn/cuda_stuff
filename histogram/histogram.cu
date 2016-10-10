@@ -318,7 +318,7 @@ void run_thrust_sort_testing(int *h_data){
   CUDATimer sort_time;
 
   sort_time.startTimer();
-  thrust::sort(t_data, t_data+NUM_BLOCKS*NUM_THREADS_PER_BLOCK,0);
+  thrust::sort(t_data, t_data+NUM_BLOCKS*NUM_THREADS_PER_BLOCK);
   sort_time.stopTimer();
 
   double time_ms = sort_time.getElapsedTime();
