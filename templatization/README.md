@@ -7,4 +7,8 @@ carries with it an obvious promise, asking for infrastructural developments we a
 the present iteration of our experiments. Our utilitarian psyche is perfectly in al(l)ignment with
 those much frowned upon exploratory proclivities which I delude myself thinking might resonate
 with the likes of Livingstone and Columbus. Into the the unexplored country from whose bourne,
-every traveller must return, beckons. 
+every traveller must return, beckons.
+
+Afternote (post nap): It does not strike one as unreasonable to use thrust for the exact same
+needs aforementioned above. We must place our faith in the age old wisdom that reinventing
+the wheel is usually an unneccessary exercise. 
