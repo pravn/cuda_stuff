@@ -56,3 +56,36 @@ TODO
 	b) Per thread histogram as per Wilt
 	c) Ballot+Popc followed by a subsequent reduction.
 	
+UPDATE: Sunday, Oct 16 2016
+---------------------------
+A warp level atomicAdd is now included. This gives 2X improvements in Kepler (sm_35, K6000),
+but in Maxwell, we don't find any performance difference between the vanilla shared memory
+atomicAdd and the warp level atomicAdd. It might therefore appear that Maxwell's atomicAdd 
+somehow has this factored in. This is for the case where the input is extremely degenerate,
+with all data being written to bin 0.
+
+There are a few more ideas to try to improve atomics performance for highly degenerate 
+input.
+
+1) Block level sort + count - the sorting algorithm is to be understood and chosen. Some
+	code exits in the NVIDIA samples for bitonic sort. 
+
+2) Privatized histograms - It was conjectured that there won't be enough shared memory 
+   for thread level histograms in shared memory. However, it would be interesting 
+   to investigate privatized histograms in global memory. 
+
+3) Ballot popc warp level histograms - It was concluded earlier that ballot popc 
+   needs more parallelism to compute several bins. The parallelism can be 
+   created by, for example, replicating the problem for each bin. In earlier 
+   experiments, I had concluded that replicating the problem causes contention 
+   in reading input data. However, I now see that we can also replicate 
+   the input data to do away with contention. This should be investigated.
+
+
+
+
+
+	
+	
+
+
