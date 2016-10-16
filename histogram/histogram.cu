@@ -24,6 +24,7 @@ const long int NUM_BLOCKS=1024;
 #define BIN_UNROLL 8
 
 #include "shmem_atomics_reducer.cuh"
+#include "warp_shmem_atomics_reducer.cuh"
 #include "ballot_popc_reducer.cuh"
 //this one seems to be bogus
 //#include "reducer.cuh"
@@ -54,10 +55,15 @@ void run_atomics_reducer(int *h_data){
   cudaMalloc((void **) &d_result_atomics, NUM_BINS*sizeof(int));
   cudaMemset(d_result_atomics, 0, NUM_BINS*sizeof(int));
 
-  CUDATimer atomics_timer;
 
+  int NITER = 1000;
+  CUDATimer atomics_timer;
   atomics_timer.startTimer();
-  shmem_atomics_reducer<<< NUM_BLOCKS, NUM_THREADS_PER_BLOCK>>> (d_data, d_result_atomics);
+
+  for(int i=0; i<NITER; i++){
+    cudaMemset(d_result_atomics, 0, sizeof(int)*NUM_BINS);
+    shmem_atomics_reducer<<< NUM_BLOCKS, NUM_THREADS_PER_BLOCK>>> (d_data, d_result_atomics);
+  }
 
   cudaDeviceSynchronize();
   atomics_timer.stopTimer();
@@ -79,7 +85,7 @@ void run_atomics_reducer(int *h_data){
 
   std::cout << "MB = " << mbytes << std::endl;
 
-  float bandwidth = mbytes/atomics_timer.getElapsedTime()*1e3;
+  float bandwidth = mbytes/atomics_timer.getElapsedTime()*1e3*NITER;
   std::cout << "atomics bandwidth for scalar loads (MB/s) " << bandwidth << std::endl;
 
   for(int i=0; i<NUM_BINS; i++){
@@ -92,6 +98,67 @@ void run_atomics_reducer(int *h_data){
   delete[] h_result;
 
 }
+
+
+void run_warp_atomics_reducer(int *h_data){
+  int *d_data;
+  int *h_result_warp_atomics;
+  int *d_result_warp_atomics;
+  int *h_result;
+
+  cudaMalloc((void **) &d_data, NUM_THREADS_PER_BLOCK*NUM_BLOCKS*sizeof(int));
+  cudaMemcpy(d_data, h_data, NUM_THREADS_PER_BLOCK*NUM_BLOCKS*sizeof(int), cudaMemcpyHostToDevice);
+
+  h_result = new int[NUM_BINS];
+  memset(h_result, 0, NUM_BINS*sizeof(int));
+
+  cudaMalloc((void **) &d_result_warp_atomics, NUM_BINS*sizeof(int));
+  cudaMemset(d_result_warp_atomics, 0, NUM_BINS*sizeof(int));
+
+  CUDATimer warp_atomics_timer;
+
+  int NITER = 1000;
+  
+  warp_atomics_timer.startTimer();
+  for(int i=0; i<NITER; i++){
+    cudaMemset(d_result_warp_atomics, 0, sizeof(int)*NUM_BINS);
+    warp_shmem_atomics_reducer<<< NUM_BLOCKS, NUM_THREADS_PER_BLOCK>>> (d_data, d_result_warp_atomics);
+  }
+
+  cudaDeviceSynchronize();
+  warp_atomics_timer.stopTimer();
+
+  for(int i=0; i<NUM_THREADS_PER_BLOCK*NUM_BLOCKS; i++){
+    for(int j=0; j<NUM_BINS; j++){
+      if(h_data[i]==j)
+	h_result[j]++;
+    }
+  }
+
+  h_result_warp_atomics = new int[NUM_BINS];
+  cudaMemcpy(h_result_warp_atomics, d_result_warp_atomics, NUM_BINS*sizeof(int), cudaMemcpyDeviceToHost);
+
+  std::cout << "======================================" << std::endl;
+    std::cout << "warp atomics time " << warp_atomics_timer.getElapsedTime() << std::endl;
+
+  float mbytes = NUM_THREADS_PER_BLOCK*NUM_BLOCKS*sizeof(int)*1e-6;
+
+  std::cout << "MB = " << mbytes << std::endl;
+
+  float bandwidth = mbytes/warp_atomics_timer.getElapsedTime()*1e3*NITER;
+  std::cout << "warp atomics bandwidth for scalar loads (MB/s) " << bandwidth << std::endl;
+
+  for(int i=0; i<NUM_BINS; i++){
+    std::cout << h_result[i] << " " << h_result_warp_atomics[i] << std::endl;
+    }
+
+  cudaFree(d_data);
+  delete[] h_result_warp_atomics;
+  cudaFree(d_result_warp_atomics);
+  delete[] h_result;
+
+}
+
 
 void run_vectorized_load_atomics(int *h_data){
   int *d_data;
@@ -409,13 +476,18 @@ int main()
 
 
   std::cout << "NUM_WARPS_PER_BLOCK " << NUM_WARPS_PER_BLOCK << std::endl;
+  std::cout << "NUM_BINS " << NUM_BINS << std::endl;
+  std::cout << "NUM_THREADS_PER_BLOCK " << NUM_THREADS_PER_BLOCK << std::endl;
+  std::cout << "NUM_BLOCKS " << NUM_BLOCKS << std::endl;
   
   //run_ballot_popc_reducer(h_data);
   //run_test_reducer(h_data);
   run_atomics_reducer(h_data);
   //  run_vectorized_load_atomics(h_data);
   //  run_thrust_sort_testing(h_data);
-  run_cub_histogram(h_data);
+  //  run_cub_histogram(h_data);
+
+  run_warp_atomics_reducer(h_data);
 
   //cleanup
   delete[] h_data;
