@@ -11,6 +11,6 @@ SET(CUDA_NVCC_FLAGS "-gencode arch=compute_52,code=sm_52;-gencode arch=compute_3
 #ADD_SUBDIRECTORY(matmul_shmem)
 #ADD_SUBDIRECTORY(shffl)
 #ADD_SUBDIRECTORY(ballot)
-#ADD_SUBDIRECTORY(histogram)
+ADD_SUBDIRECTORY(histogram)
 #ADD_SUBDIRECTORY(vectorized_loads)
-ADD_SUBDIRECTORY(templatization)
+#ADD_SUBDIRECTORY(templatization)

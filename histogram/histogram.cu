@@ -4,6 +4,7 @@
 #include <thrust/device_vector.h>
 #include <thrust/count.h>
 #include <thrust/sort.h>
+#include <cub/cub/cub.cuh>
 
 //initial attempt - probably not very performant
 //histogram with N bins in several blocks 
@@ -17,7 +18,7 @@
 
 const long int NUM_BLOCKS=1024;
 #define WARP_SIZE 32 
-#define NUM_BINS 32
+#define NUM_BINS 1
 #define NUM_THREADS_PER_BLOCK 128
 #define NUM_WARPS_PER_BLOCK NUM_THREADS_PER_BLOCK/WARP_SIZE
 #define BIN_UNROLL 8
@@ -29,6 +30,7 @@ const long int NUM_BLOCKS=1024;
 //another bogus test
 //#include "test_reducer.cuh"
 #include "vectorized_load_atomics.cuh"
+#include "cub_block_histogram.cuh"
 
 inline double calc_bandwidth(double time_ms){
   int megabyte =  1<<20;
@@ -330,7 +332,63 @@ void run_thrust_sort_testing(int *h_data){
 }
   
 
+void run_cub_histogram(int *h_data){
+  int *d_data;
+  int *h_result_cub;
+  int *d_result_cub;
+  int *h_result;
+  
+  
+  cudaMalloc((void **) &d_data, NUM_BLOCKS*NUM_THREADS_PER_BLOCK*sizeof(int));
+  cudaMemcpy(d_data, h_data, NUM_BLOCKS*NUM_THREADS_PER_BLOCK*sizeof(int), cudaMemcpyHostToDevice);
 
+    h_result = new int[NUM_BINS];
+  memset(h_result, 0, NUM_BINS*sizeof(int));
+
+  cudaMalloc((void **) &d_result_cub, NUM_BINS*sizeof(int));
+  cudaMemset(d_result_cub, 0, NUM_BINS*sizeof(int));
+
+  CPUTimer cub_timer;
+  cub_timer.startTimer();
+  const int NITER=1000;
+  
+  for(int iter = 0; iter < NITER; iter++){
+    cudaMemset(d_result_cub, 0,  NUM_BINS*sizeof(int));
+    cub_block_histogram<<<NUM_BLOCKS, NUM_THREADS_PER_BLOCK>>>(d_data, d_result_cub);
+  }
+      cudaDeviceSynchronize();
+  cub_timer.stopTimer();
+  
+    for(int i=0; i<NUM_THREADS_PER_BLOCK*NUM_BLOCKS; i++){
+    for(int j=0; j<NUM_BINS; j++){
+      if(h_data[i]==j)
+	h_result[j]++;
+    }
+  }
+
+    
+    h_result_cub = new int[NUM_BINS];
+    cudaMemcpy(h_result_cub, d_result_cub, NUM_BINS*sizeof(int), cudaMemcpyDeviceToHost);
+
+  float mbytes = NUM_THREADS_PER_BLOCK*NUM_BLOCKS*sizeof(int)*1e-6;
+  float bandwidth = NITER*mbytes/cub_timer.getElapsedTime()*1e3;
+  std::cout << "cub time " << cub_timer.getElapsedTime();
+  std::cout << "cub bandwidth " << bandwidth << std::endl;
+
+
+  
+  for(int i=0; i<NUM_BINS; i++){
+    std::cout << h_result[i] << " " << h_result_cub[i] << std::endl;
+    }
+
+
+  cudaFree(d_data);
+  delete[] h_result_cub;
+  cudaFree(d_result_cub);
+  delete[] h_result;
+
+}
+  
 int main()
 {
   int *h_data; 
@@ -344,7 +402,6 @@ int main()
     #ifdef WORST_CASE
     h_data[i] = 0;
     #endif
-
 	    
 
   }
@@ -356,8 +413,9 @@ int main()
   //run_ballot_popc_reducer(h_data);
   //run_test_reducer(h_data);
   run_atomics_reducer(h_data);
-  run_vectorized_load_atomics(h_data);
-  run_thrust_sort_testing(h_data);
+  //  run_vectorized_load_atomics(h_data);
+  //  run_thrust_sort_testing(h_data);
+  run_cub_histogram(h_data);
 
   //cleanup
   delete[] h_data;
