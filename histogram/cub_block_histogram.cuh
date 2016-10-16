@@ -1,5 +1,5 @@
-#include <cub/cub/block/block_load.cuh>
-#include <cub/cub/block/block_store.cuh>
+#include <cub/block/block_load.cuh>
+#include <cub/block/block_store.cuh>
 __global__ void cub_block_histogram(int *data, int *result){
   typedef cub::BlockHistogram<int, NUM_THREADS_PER_BLOCK, 1, NUM_BINS,cub::BLOCK_HISTO_SORT> BlockHistogram;
 

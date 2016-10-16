@@ -4,7 +4,7 @@
 #include <thrust/device_vector.h>
 #include <thrust/count.h>
 #include <thrust/sort.h>
-#include <cub/cub/cub.cuh>
+#include <cub/cub.cuh>
 
 //initial attempt - probably not very performant
 //histogram with N bins in several blocks 
